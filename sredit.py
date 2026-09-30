@@ -55,14 +55,24 @@ def post_id_from_url(url):
 
 
 def post_status(p):
-    # Removed by mods/Reddit filters, or deleted by the author: not shown on the subreddit
+    # Removed by mods/Reddit filters, or deleted by the author: not shown on the subreddit.
+    # The archive's second fetch (_meta.removal_type) also catches posts removed later.
     category = p.get("removed_by_category")
     text = p.get("selftext", "")
-    if category == "deleted" or text == "[deleted]":
+    removal = (p.get("_meta") or {}).get("removal_type")
+    if category == "deleted" or text == "[deleted]" or removal == "deleted":
         return "deleted"
-    if category or text == "[removed]":
+    if category or text == "[removed]" or removal:
         return "removed"
     return "visible"
+
+
+def score_of(p):
+    # The archive saves posts seconds after they are made, so the score is almost always 1.
+    # It fetches each post again about 36 hours later; until then the score is left empty.
+    if "retrieved_on" in p and not (p.get("_meta") or {}).get("retrieved_2nd_on"):
+        return ""
+    return p.get("score")
 
 
 def keep_post(p, show):
@@ -76,7 +86,7 @@ def make_post(p):
         "post_author": p.get("author"),
         "post_text": p.get("selftext", ""),
         "date": fmt_time(p["created_utc"]),
-        "score": p.get("score"),
+        "score": score_of(p),
         "num_comments": p.get("num_comments"),
         "url": REDDIT + p.get("permalink", f"/comments/{p['id']}/"),
         "status": post_status(p)
@@ -303,6 +313,24 @@ def main():
 
     if not posts:
         sys.exit("No posts found. Check the subreddit name.")
+
+    # Saved posts still waiting for their score are fetched again from the archive
+    urls = {p["url"] for p in posts}
+    if not old_posts.empty and "score" in old_posts:
+        waiting = old_posts[(old_posts["score"] == "") & ~old_posts["url"].isin(urls)]
+        if not waiting.empty:
+            print(f"Updating {len(waiting)} saved posts that had no score yet ...")
+            ids = [post_id_from_url(u) for u in waiting["url"]]
+            refreshed = archive_posts_by_ids(ids, len(ids), "all")
+            hidden = {p["url"] for p in refreshed if p["status"] != "visible"}
+            if show == "visible" and hidden:
+                # Removed or deleted since they were saved
+                old_posts = old_posts[~old_posts["url"].isin(hidden)]
+                if not old_comments.empty:
+                    old_comments = old_comments[~old_comments["post_url"].isin(hidden)]
+                refreshed = [p for p in refreshed if p["url"] not in hidden]
+                print(f"  Dropped {len(hidden)} posts that were removed or deleted since")
+            posts += refreshed
 
     comments = []
     for i, post in enumerate(posts, 1):

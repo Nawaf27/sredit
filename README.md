@@ -61,6 +61,7 @@ data/<subreddit>/
 **posts.csv**: `post_title`, `post_author`, `post_text`, `date`, `score`, `num_comments`, `url`, `status`
 
 - `status` is `visible`, `removed` (removed by moderators or Reddit's filters) or `deleted` (deleted by the author).
+- `score` is empty for posts under about 36 hours old when the data comes from the archive (see Notes).
 
 **comments.csv**: `post_title`, `username`, `is_post_author`, `reply_to`, `comment`, `date`, `post_url`
 
@@ -73,4 +74,5 @@ Dates are in Saudi time (UTC+3). Files are written as UTF-8 with BOM, so Arabic 
 - Running the script again on the same subreddit adds new posts and refreshes posts that were already saved (their comments are replaced with the fresh copy).
 - Pinned posts are skipped.
 - Collapsed comment threads ("load more comments") are skipped when reading from Reddit directly.
-- Removed/deleted status comes from the archive. A post removed after the archive last updated it can still show as `visible`.
+- The archive saves each post seconds after it is made, so its score at that point is almost always 1. It fetches the post again about 36 hours later, which updates the score and marks posts that were removed or deleted in the meantime. Until then `score` is left empty, and the next run fetches those posts again to fill it in (and, without `--all`, drops any that were removed).
+- A post removed more than about 36 hours after it was made can still show as `visible`.
