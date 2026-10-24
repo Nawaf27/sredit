@@ -263,7 +263,9 @@ def ask(prompt, default, choices=None):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if a != "--all"]
+    # Windows uses a non-UTF-8 encoding when the output goes to a file or pipe; Arabic titles need UTF-8
+    sys.stdout.reconfigure(encoding="utf-8")
+    args =[a for a in sys.argv[1:] if a != "--all"]
     if len(args) > 2:
         # python sredit.py <subreddit> <num_posts> <sort> [period] [--all]
         subreddit, count, sort = args[0], args[1], args[2].lower()
