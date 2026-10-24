@@ -1,16 +1,16 @@
 # sredit
 
-A small script that downloads posts and comments from a subreddit and saves them as CSV files.
+A small script that downloads posts and comments from a subreddit, saves them as CSV files, and analyzes who replies to whom.
+
+![Reply network](docs/reply_network.png)
 
 It tries Reddit's own `.json` endpoints first. If Reddit blocks the request (HTTP 403), it falls back to the public [Arctic Shift](https://arctic-shift.photon-reddit.com) archive, using Reddit's RSS feeds to keep the hot / top / rising order.
 
 ## Requirements
 
 - Python 3.9+
-- `requests` and `pandas`
-
 ```
-pip install requests pandas
+pip install -r requirements.txt
 ```
 
 ## Usage
@@ -45,7 +45,7 @@ python sredit.py SaudiProfessionals 50 top month
 python sredit.py SaudiProfessionals 100 new --all
 ```
 
-Without `--all`, only visible posts are saved.
+Without `--all`, only visible posts are saved. `--all` also keeps posts that their authors deleted or that moderators removed; leave it off unless you need them for moderation research.
 
 ## Output
 
@@ -68,6 +68,24 @@ data/<subreddit>/
 **users.csv**: `username`, `posts`, `comments`, `total`, which counts each user's posts and comments across all saved data, sorted by total.
 
 Dates are in Saudi time (UTC+3). Files are written as UTF-8 with BOM, so Arabic text opens correctly in Excel.
+
+## Analysis
+
+```
+python analyze.py <subreddit> [output_folder]
+```
+
+Reads the saved CSVs (visible posts only) and writes to `data/<subreddit>/analysis/`:
+
+- **reply_network.png**: who replies to whom. Each user is a node; an arrow from A to B means A replied to B (a top-level comment counts as a reply to the post's author). Node size is replies received, colour is the community found by modularity clustering.
+- **activity.png**: posts and comments per day, and the share of each by hour of day.
+- **network_users.csv**: per user: `replies_received`, `replies_sent`, `people_talked_to`, `betweenness`, `community`.
+
+Usernames are replaced with `User_1`, `User_2`, ... ranked by activity, so the output can be shared. `[deleted]` accounts, AutoModerator and replies to yourself are left out.
+
+The images above and below come from the top 100 posts of the month on r/SaudiForSaudis (October 2026):
+
+![Activity](docs/activity.png)
 
 ## Notes
 

@@ -9,10 +9,8 @@ from datetime import datetime, timezone, timedelta
 # Each subreddit gets its own folder: data/<subreddit>/posts.csv, comments.csv, users.csv
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/140.0 Safari/537.36"
-}
+# Reddit asks scripts to identify themselves instead of posing as a browser
+HEADERS = {"User-Agent": "sredit/1.0 by Nawaf27 (https://github.com/Nawaf27/sredit)"}
 REDDIT = "https://www.reddit.com"
 # Public Reddit archive, used when Reddit blocks the .json endpoints (403)
 ARCHIVE = "https://arctic-shift.photon-reddit.com/api"
@@ -35,7 +33,8 @@ def get(url, params=None, raw=False):
         r = session.get(url, params=params, timeout=60)
         if r.status_code == 403:
             raise Blocked(url)
-        if r.status_code in (429, 500, 502, 503, 504):
+        # The archive answers 422 when a query times out on its side
+        if r.status_code in (422, 429, 500, 502, 503, 504):
             wait = 30 * (attempt + 1) if r.status_code == 429 else 5 * (attempt + 1)
             print(f"  Server busy ({r.status_code}), waiting {wait}s...")
             time.sleep(wait)
@@ -238,7 +237,8 @@ def find_folder(subreddit):
 
 
 def load_csv(path):
-    if os.path.exists(path):
+    # A run where no post had comments yet leaves an empty file
+    if os.path.exists(path) and os.path.getsize(path) > 3:
         return pd.read_csv(path, dtype=str, keep_default_na=False)
     return pd.DataFrame()
 
